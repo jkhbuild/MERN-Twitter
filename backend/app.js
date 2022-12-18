@@ -2,7 +2,7 @@ const express = require("express");
 // const path = require("path"); removed
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
-
+const debug = require("debug");
 // added for cors
 const cors = require("cors");
 const csurf = require("csurf");
@@ -28,6 +28,15 @@ if (!isProduction) {
   app.use(cors());
 }
 
+app.use(
+  csurf({
+    cookie: {
+      secure: isProduction,
+      sameSite: isProduction && "Lax",
+      httpOnly: true,
+    },
+  })
+);
 // Set the _csrf token and create req.csrfToken method to generate a hashed
 // CSRF token
 app.use(
