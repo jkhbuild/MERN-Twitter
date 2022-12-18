@@ -28,15 +28,6 @@ if (!isProduction) {
   app.use(cors());
 }
 
-app.use(
-  csurf({
-    cookie: {
-      secure: isProduction,
-      sameSite: isProduction && "Lax",
-      httpOnly: true,
-    },
-  })
-);
 // Set the _csrf token and create req.csrfToken method to generate a hashed
 // CSRF token
 app.use(
@@ -54,5 +45,26 @@ app.use(
 app.use("/api/users", usersRouter); // update the path
 app.use("/api/tweets", tweetsRouter);
 app.use("/api/csrf", csrfRouter);
+
+app.use((req, res, next) => {
+  const err = new Error("Not Found");
+  err.statusCode = 404;
+  next(err);
+});
+
+const serverErrorLogger = debug("backend:error");
+
+// Express custom error handler that will be called whenever a route handler or
+// middleware throws an error or invokes the `next` function with a truthy value
+app.use((err, req, res, next) => {
+  serverErrorLogger(err);
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode);
+  res.json({
+    message: err.message,
+    statusCode,
+    errors: err.errors,
+  });
+});
 
 module.exports = app;
