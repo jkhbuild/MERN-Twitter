@@ -13,6 +13,9 @@ const { mongoURI: db } = require("../config/keys.js");
 const serverLogger = debug("backend:server");
 const dbLogger = debug("backend:mongodb");
 
+const port = normalizePort(process.env.PORT || "5000");
+app.set("port", port);
+
 function onListening() {
   var addr = server.address();
   var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
@@ -48,41 +51,18 @@ const insertSeeds = () => {
     });
 };
 
-/**
- * Get port from environment and store in Express.
- */
-
-const port = normalizePort(process.env.PORT || "5000");
-app.set("port", port);
-
-/**
- * Create HTTP server.
- */
-
 const server = http.createServer(app);
 
-/**
- * Connect to Mongo database, then allow the server to listen for requests
- */
 mongoose
   .connect(db, { useNewUrlParser: true })
   .then(() => {
     dbLogger("Connected to MongoDB successfully");
-
-    /**
-     * Listen on provided port, on all network interfaces.
-     */
-
     server.listen(port);
   })
   .catch((err) => serverLogger(err));
 
 server.on("error", onError);
 server.on("listening", onListening);
-
-/**
- * Normalize a port into a number, string, or false.
- */
 
 function normalizePort(val) {
   const port = parseInt(val, 10);
@@ -129,3 +109,8 @@ function onError(error) {
 /**
  * Event listener for HTTP server "listening" event.
  */
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
+  serverLogger("Listening on " + bind);
+}
