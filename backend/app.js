@@ -1,17 +1,17 @@
 const express = require("express");
-// const path = require("path"); removed
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const debug = require("debug");
-// added for cors
 const cors = require("cors");
 const csurf = require("csurf");
-const { isProduction } = require("./config/keys");
+/* --- Need to import these to load the models into mongoose --- */
+require("./models/User");
+require("./models/Tweet");
+/* ------------------------------------------------------------- */
+require("./config/passport"); // Need to import to configure passport module
+const passport = require("passport");
 
-// const indexRouter = require("./routes/index"); removed
-const usersRouter = require("./routes/api/users"); // update the import file path
-const tweetsRouter = require("./routes/api/tweets");
-const csrfRouter = require("./routes/api/csrf");
+const { isProduction } = require("./config/keys");
 
 const app = express();
 
@@ -19,12 +19,14 @@ app.use(logger("dev")); // log request components (URL/method) to terminal
 app.use(express.json()); // parse JSON request body
 app.use(express.urlencoded({ extended: false })); // parse urlencoded request body
 app.use(cookieParser()); // parse cookies as an object on req.cookies
-// app.use(express.static(path.join(__dirname, "public"))); // serve the static files in the public folder removed
 
+app.use(passport.initialize()); // make Express use passport for authentication
+
+// Security Middleware
 if (!isProduction) {
-  // Enable CORS only in development because React will be on the React
-  // development server (http://localhost:3000). (In production, the Express
-  // server will serve the React files statically.)
+  // enable CORS only in development because React will be on the React
+  // development server (http://localhost:3000)
+  // (In production, React files will be served statically on the Express server)
   app.use(cors());
 }
 
@@ -40,12 +42,37 @@ app.use(
   })
 );
 
+// app.get("/", (req, res) => res.send("Hello World!!"));
+
 // Attach Express routers
-// app.use("/", indexRouter); removed
-app.use("/api/users", usersRouter); // update the path
+const tweetsRouter = require("./routes/api/tweets");
+const usersRouter = require("./routes/api/users");
+const csrfRouter = require("./routes/api/csrf");
 app.use("/api/tweets", tweetsRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/csrf", csrfRouter);
 
+// Serve static React build files statically in production
+if (isProduction) {
+  const path = require("path");
+  // Serve the frontend's index.html file at the root route
+  app.get("/", (req, res) => {
+    res.cookie("CSRF-TOKEN", req.csrfToken());
+    res.sendFile(path.resolve(__dirname, "../frontend", "build", "index.html"));
+  });
+
+  // Serve the static assets in the frontend's build folder
+  app.use(express.static(path.resolve("../frontend/build")));
+
+  // Serve the frontend's index.html file at all other routes NOT starting with /api
+  app.get(/^(?!\/?api).*/, (req, res) => {
+    res.cookie("CSRF-TOKEN", req.csrfToken());
+    res.sendFile(path.resolve(__dirname, "../frontend", "build", "index.html"));
+  });
+}
+
+// Express custom middleware for catching all unmatched requests and formatting
+// a 404 error to be sent as the response.
 app.use((req, res, next) => {
   const err = new Error("Not Found");
   err.statusCode = 404;
@@ -53,7 +80,6 @@ app.use((req, res, next) => {
 });
 
 const serverErrorLogger = debug("backend:error");
-
 // Express custom error handler that will be called whenever a route handler or
 // middleware throws an error or invokes the `next` function with a truthy value
 app.use((err, req, res, next) => {
